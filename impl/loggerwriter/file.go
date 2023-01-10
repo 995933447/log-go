@@ -43,6 +43,7 @@ var OpenNewFileByByDateHour CheckTimeToOpenNewFileFunc  = func (lastOpenFileTime
 }
 
 type FileLoggerWriter struct {
+	enabledStdoutPrinter atomic.Bool
 	fp *os.File
 	baseDir string
 	maxFileSize int64
@@ -72,6 +73,14 @@ func NewFileLoggerWriter(baseDir string, maxFileSize int64, checkFileFullInterva
 		flushSignCh: make(chan struct{}),
 		flushDoneSignCh: make(chan error),
 	}
+}
+
+func (w *FileLoggerWriter) EnableStdoutPrinter() {
+	w.enabledStdoutPrinter.Store(true)
+}
+
+func (w *FileLoggerWriter) DisableStdoutPrinter() {
+	w.enabledStdoutPrinter.Store(false)
 }
 
 func (w *FileLoggerWriter) SetFormatter(fmt log.Formatter) *FileLoggerWriter {
@@ -135,9 +144,14 @@ func (w *FileLoggerWriter) Write(ctx context.Context, level log.Level, format st
 	if !ok {
 		stdoutColor = print.ColorNil
 	}
+
 	logContent, err := w.fmt.Sprintf(ctx, level, stdoutColor, format, args...)
 	if err != nil {
 		return err
+	}
+
+	if w.enabledStdoutPrinter.Load() {
+		fmt.Print(logContent)
 	}
 
 	w.bufCh <- []byte(logContent)
@@ -193,7 +207,7 @@ func (w *FileLoggerWriter) Loop() error {
 		bufLen := len(buf)
 		var totalWrittenBytes int
 		for {
-			n, err := w.fp.Write(buf)
+			n, err := w.fp.Write(buf[totalWrittenBytes:])
 			if err != nil {
 				return err
 			}

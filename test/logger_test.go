@@ -14,7 +14,7 @@ func TestStdoutLog(t *testing.T) {
 }
 
 func TestFileLog(t *testing.T) {
-	loggerWriter := loggerwriter.NewFileLoggerWriter(
+	writer := loggerwriter.NewFileLoggerWriter(
 		"/var/log/testlog",
 		100,
 		10,
@@ -22,16 +22,18 @@ func TestFileLog(t *testing.T) {
 		100000,
 	)
 
+	writer.EnableStdoutPrinter()
 	go func() {
-		if err := loggerWriter.Loop(); err != nil {
+		if err := writer.Loop(); err != nil {
 			panic(err)
 		}
 	}()
 
-	logger := log.NewLogger(loggerWriter)
+	logger := log.NewLogger(writer)
 	ctx := simpletracectx.New("testlog", context.TODO(),"", "")
 	logger.Debugf(ctx, "err:%v", "unknown err.")
 	logger.Errorf(ctx, "err:%v", "unknown err.")
+	writer.DisableStdoutPrinter()
 	logger.Error(ctx, "err one")
 
 	if err := logger.Flush(); err != nil {
