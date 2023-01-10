@@ -24,6 +24,10 @@ func NewLogger(loggerWriter LoggerWriter) *Logger {
 	}
 }
 
+func (l *Logger) GetWriter() LoggerWriter {
+	return l.loggerWriter
+}
+
 func (l *Logger) SetLogLevel(level Level)  {
 	l.mu.Lock()
 	defer l.mu.Unlock()
