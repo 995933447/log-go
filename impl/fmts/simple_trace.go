@@ -46,18 +46,27 @@ func (f *SimpleTraceFormatter) Sprintf(ctx context.Context, level log.Level, std
 		moduleName string
 		traceId, spanId, parentSpanId string
 	)
-	if traceCtx, ok := ctx.(*simpletracectx.Context); ok {
-		parentSpanId = traceCtx.GetParentSpanId()
-		spanId = traceCtx.GetSpanId()
-		traceId = traceCtx.GetTraceId()
-		moduleName = traceCtx.GetModuleName()
-		if traceCtx.GetParentSpanId() == "" {
-			parentSpanId = "none"
+	if ctx != nil {
+		if traceCtx, ok := ctx.(*simpletracectx.Context); ok {
+			parentSpanId = traceCtx.GetParentSpanId()
+			spanId = traceCtx.GetSpanId()
+			traceId = traceCtx.GetTraceId()
+			moduleName = traceCtx.GetModuleName()
+			if traceCtx.GetParentSpanId() == "" {
+				parentSpanId = "none"
+			}
 		}
-	} else {
+	}
+	if spanId == "" {
 		spanId = "none"
+	}
+	if parentSpanId == "" {
 		parentSpanId = "none"
+	}
+	if traceId == "" {
 		traceId = "none"
+	}
+	if moduleName == "" {
 		moduleName = "(unknown)"
 	}
 
