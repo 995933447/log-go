@@ -46,7 +46,7 @@ func (f *SimpleTraceFormatter) Sprintf(ctx context.Context, level log.Level, std
 		moduleName string
 		traceId, spanId, parentSpanId string
 	)
-	if traceCtx := ctx.(*simpletracectx.Context); traceCtx != nil {
+	if traceCtx, ok := ctx.(*simpletracectx.Context); ok && traceCtx != nil {
 		parentSpanId = traceCtx.GetParentSpanId()
 		spanId = traceCtx.GetSpanId()
 		traceId = traceCtx.GetTraceId()
