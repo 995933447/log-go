@@ -89,7 +89,7 @@ func (w *FileLoggerWriter) SetFormatter(fmt log.Formatter) *FileLoggerWriter {
 }
 
 func (w *FileLoggerWriter) checkFileIsFull() (bool, error) {
-	if w.lastCheckIsFullAt + w.checkFileFullIntervalSecs < time.Now().Unix() {
+	if w.lastCheckIsFullAt != 0 && w.lastCheckIsFullAt + w.checkFileFullIntervalSecs < time.Now().Unix() {
 		return w.isFileFull, nil
 	}
 
@@ -200,7 +200,7 @@ func (w *FileLoggerWriter) Loop() error {
 		if isFull, err := w.checkFileIsFull(); err != nil  {
 			return err
 		} else if isFull {
-			fmt.Printf("log file %s is overflow max size %d bytes.", w.currentFileName, w.maxFileSize)
+			fmt.Printf("log file %s is overflow max size %d bytes.\n", w.currentFileName, w.maxFileSize)
 			return nil
 		}
 

@@ -16,7 +16,7 @@ func TestStdoutLog(t *testing.T) {
 func TestFileLog(t *testing.T) {
 	writer := loggerwriter.NewFileLoggerWriter(
 		"/var/log/testlog",
-		100,
+		10000,
 		10,
 		loggerwriter.OpenNewFileByByDateHour,
 		100000,
