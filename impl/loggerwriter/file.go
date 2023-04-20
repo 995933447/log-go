@@ -15,8 +15,8 @@ import (
 
 var levelToStdoutColorMap = map[log.Level]print.Color{
 	log.LevelDebug: print.ColorBlue,
-	log.LevelInfo: print.ColorGreen,
-	log.LevelWarn: print.ColorYellow,
+	log.LevelInfo:  print.ColorGreen,
+	log.LevelWarn:  print.ColorYellow,
 	log.LevelError: print.ColorRed,
 	log.LevelFatal: print.ColorPurple,
 	log.LevelPanic: print.ColorRed,
@@ -24,7 +24,7 @@ var levelToStdoutColorMap = map[log.Level]print.Color{
 
 type CheckTimeToOpenNewFileFunc func(lastOpenFileTime *time.Time, isNeverOpenFile bool) (string, bool)
 
-var OpenNewFileByByDateHour CheckTimeToOpenNewFileFunc  = func (lastOpenFileTime *time.Time, isNeverOpenFile bool) (string, bool) {
+var OpenNewFileByByDateHour CheckTimeToOpenNewFileFunc = func(lastOpenFileTime *time.Time, isNeverOpenFile bool) (string, bool) {
 	if isNeverOpenFile {
 		return time.Now().Format("2006010215.log"), true
 	}
@@ -43,35 +43,35 @@ var OpenNewFileByByDateHour CheckTimeToOpenNewFileFunc  = func (lastOpenFileTime
 }
 
 type FileLoggerWriter struct {
-	enabledStdoutPrinter atomic.Bool
-	fp *os.File
-	baseDir string
-	maxFileSize int64
-	lastCheckIsFullAt int64
-	isFileFull bool
+	enabledStdoutPrinter      atomic.Bool
+	fp                        *os.File
+	baseDir                   string
+	maxFileSize               int64
+	lastCheckIsFullAt         int64
+	isFileFull                bool
 	checkFileFullIntervalSecs int64
-	checkTimeToOpenNewFile CheckTimeToOpenNewFileFunc
-	openCurrentFileTime *time.Time
-	currentFileName string
-	fmt log.Formatter
-	bufCh chan []byte
-	isFlushing atomic.Value
-	flushSignCh chan struct{}
-	flushDoneSignCh chan error
+	checkTimeToOpenNewFile    CheckTimeToOpenNewFileFunc
+	openCurrentFileTime       *time.Time
+	currentFileName           string
+	fmt                       log.Formatter
+	bufCh                     chan []byte
+	isFlushing                atomic.Bool
+	flushSignCh               chan struct{}
+	flushDoneSignCh           chan error
 }
 
 var _ log.LoggerWriter = (*FileLoggerWriter)(nil)
 
 func NewFileLoggerWriter(baseDir string, maxFileSize int64, checkFileFullIntervalSecs int64, checkTimeToOpenNewFile CheckTimeToOpenNewFileFunc, bufChanLen uint32) *FileLoggerWriter {
 	return &FileLoggerWriter{
-		baseDir: strings.TrimRight(baseDir, "/"),
-		maxFileSize: maxFileSize,
+		baseDir:                   strings.TrimRight(baseDir, "/"),
+		maxFileSize:               maxFileSize,
 		checkFileFullIntervalSecs: checkFileFullIntervalSecs,
-		checkTimeToOpenNewFile: checkTimeToOpenNewFile,
-		fmt: fmts.NewSimpleTraceFormatter(4, fmts.FormatText),
-		bufCh: make(chan []byte, bufChanLen),
-		flushSignCh: make(chan struct{}),
-		flushDoneSignCh: make(chan error),
+		checkTimeToOpenNewFile:    checkTimeToOpenNewFile,
+		fmt:                       fmts.NewSimpleTraceFormatter(4, fmts.FormatText),
+		bufCh:                     make(chan []byte, bufChanLen),
+		flushSignCh:               make(chan struct{}),
+		flushDoneSignCh:           make(chan error),
 	}
 }
 
@@ -89,7 +89,7 @@ func (w *FileLoggerWriter) SetFormatter(fmt log.Formatter) *FileLoggerWriter {
 }
 
 func (w *FileLoggerWriter) checkFileIsFull() (bool, error) {
-	if w.lastCheckIsFullAt != 0 && w.lastCheckIsFullAt + w.checkFileFullIntervalSecs < time.Now().Unix() {
+	if w.lastCheckIsFullAt != 0 && w.lastCheckIsFullAt+w.checkFileFullIntervalSecs < time.Now().Unix() {
 		return w.isFileFull, nil
 	}
 
@@ -126,7 +126,7 @@ func (w *FileLoggerWriter) tryOpenNewFile() error {
 		}
 	}
 
-	if w.fp, err = os.OpenFile(w.baseDir + "/" + fileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0755); err != nil{
+	if w.fp, err = os.OpenFile(w.baseDir+"/"+fileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0755); err != nil {
 		return err
 	}
 
@@ -162,7 +162,7 @@ func (w *FileLoggerWriter) Write(ctx context.Context, level log.Level, format st
 func (w *FileLoggerWriter) Flush() error {
 	w.isFlushing.Store(true)
 	w.flushSignCh <- struct{}{}
-	return <- w.flushDoneSignCh
+	return <-w.flushDoneSignCh
 }
 
 func (w *FileLoggerWriter) finishFlush(err error) {
@@ -171,7 +171,7 @@ func (w *FileLoggerWriter) finishFlush(err error) {
 }
 
 func (w *FileLoggerWriter) isFlushingNow() bool {
-	return w.isFlushing.Load().(bool)
+	return w.isFlushing.Load()
 }
 
 func (w *FileLoggerWriter) Loop() error {
@@ -179,7 +179,7 @@ func (w *FileLoggerWriter) Loop() error {
 		for {
 			var moreBuf []byte
 			select {
-			case moreBuf = <- w.bufCh:
+			case moreBuf = <-w.bufCh:
 				buf = append(buf, moreBuf...)
 			default:
 			}
@@ -188,7 +188,7 @@ func (w *FileLoggerWriter) Loop() error {
 				break
 			}
 		}
-		
+
 		if len(buf) == 0 {
 			return nil
 		}
@@ -197,7 +197,7 @@ func (w *FileLoggerWriter) Loop() error {
 			return err
 		}
 
-		if isFull, err := w.checkFileIsFull(); err != nil  {
+		if isFull, err := w.checkFileIsFull(); err != nil {
 			return err
 		} else if isFull {
 			fmt.Printf("log file %s is overflow max size %d bytes.\n", w.currentFileName, w.maxFileSize)
@@ -222,20 +222,20 @@ func (w *FileLoggerWriter) Loop() error {
 
 	for {
 		select {
-			case buf := <- w.bufCh:
-				if err := doWriteMoreAsPossible(buf); err != nil {
-					return err
-				}
-			case _ = <-w.flushSignCh:
-				if err := doWriteMoreAsPossible([]byte{}); err != nil {
-					w.finishFlush(err)
-					break
-				}
-				if err := w.fp.Sync(); err != nil {
-					w.finishFlush(err)
-					break
-				}
-				w.finishFlush(nil)
+		case buf := <-w.bufCh:
+			if err := doWriteMoreAsPossible(buf); err != nil {
+				return err
+			}
+		case _ = <-w.flushSignCh:
+			if err := doWriteMoreAsPossible([]byte{}); err != nil {
+				w.finishFlush(err)
+				break
+			}
+			if err := w.fp.Sync(); err != nil {
+				w.finishFlush(err)
+				break
+			}
+			w.finishFlush(nil)
 		}
 	}
 }
