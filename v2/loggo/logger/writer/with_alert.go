@@ -1,10 +1,10 @@
 package writer
 
 import (
-	logger2 "github.com/995933447/log-go/v2/loggo/logger"
+	"github.com/995933447/log-go/v2/loggo/logger"
 )
 
-func NewWithAlertWriter(realWriter logger2.Writer, cfgLoader *logger2.ConfLoader, alertFunc AlertFunc) *WithAlertWriter {
+func NewWithAlertWriter(realWriter logger.Writer, cfgLoader *logger.ConfLoader, alertFunc AlertFunc) *WithAlertWriter {
 	return &WithAlertWriter{
 		cfgLoader:  cfgLoader,
 		alertFunc:  alertFunc,
@@ -12,25 +12,33 @@ func NewWithAlertWriter(realWriter logger2.Writer, cfgLoader *logger2.ConfLoader
 	}
 }
 
-var _ logger2.Writer = (*WithAlertWriter)(nil)
+var _ logger.Writer = (*WithAlertWriter)(nil)
 
-type AlertFunc func(msg *logger2.Msg)
+type AlertFunc func(msg *logger.Msg)
 
 type WithAlertWriter struct {
-	realWriter logger2.Writer
-	cfgLoader  *logger2.ConfLoader
+	realWriter logger.Writer
+	cfgLoader  *logger.ConfLoader
 	alertFunc  AlertFunc
 }
 
-func (w *WithAlertWriter) GetAlertLevel() logger2.Level {
-	levelStr := w.cfgLoader.GetConf().AlertLevel
-	if levelStr == "" {
-		return logger2.LevelWarn
-	}
-	return logger2.TransStrToLevel(levelStr)
+func (w *WithAlertWriter) EnableStdoutPrinter() {
+	w.realWriter.EnableStdoutPrinter()
 }
 
-func (w *WithAlertWriter) WriteMsg(msg *logger2.Msg) error {
+func (w *WithAlertWriter) DisableStdoutPrinter() {
+	w.realWriter.DisableStdoutPrinter()
+}
+
+func (w *WithAlertWriter) GetAlertLevel() logger.Level {
+	levelStr := w.cfgLoader.GetConf().AlertLevel
+	if levelStr == "" {
+		return logger.LevelWarn
+	}
+	return logger.TransStrToLevel(levelStr)
+}
+
+func (w *WithAlertWriter) WriteMsg(msg *logger.Msg) error {
 	if err := w.realWriter.WriteMsg(msg); err != nil {
 		return err
 	}
@@ -48,11 +56,11 @@ func (w *WithAlertWriter) WriteMsg(msg *logger2.Msg) error {
 	return nil
 }
 
-func (w *WithAlertWriter) GetMsg(level logger2.Level, format string, args ...interface{}) (*logger2.Msg, error) {
+func (w *WithAlertWriter) GetMsg(level logger.Level, format string, args ...interface{}) (*logger.Msg, error) {
 	return w.realWriter.GetMsg(level, format, args...)
 }
 
-func (w *WithAlertWriter) GetMsgBySkipCall(level logger2.Level, skipCall int, format string, args ...interface{}) (*logger2.Msg, error) {
+func (w *WithAlertWriter) GetMsgBySkipCall(level logger.Level, skipCall int, format string, args ...interface{}) (*logger.Msg, error) {
 	return w.realWriter.GetMsgBySkipCall(level, skipCall, format, args...)
 }
 
@@ -60,7 +68,7 @@ func (w *WithAlertWriter) GetSkipCall() int {
 	return w.realWriter.GetSkipCall() - 1
 }
 
-func (w *WithAlertWriter) Write(level logger2.Level, format string, args ...interface{}) error {
+func (w *WithAlertWriter) Write(level logger.Level, format string, args ...interface{}) error {
 	if w.alertFunc == nil {
 		if err := w.realWriter.Write(level, format, args...); err != nil {
 			return err
@@ -89,7 +97,7 @@ func (w *WithAlertWriter) Write(level logger2.Level, format string, args ...inte
 	return nil
 }
 
-func (w *WithAlertWriter) WriteBySkipCall(level logger2.Level, skipCall int, format string, args ...interface{}) error {
+func (w *WithAlertWriter) WriteBySkipCall(level logger.Level, skipCall int, format string, args ...interface{}) error {
 	if w.alertFunc == nil {
 		if err := w.realWriter.WriteBySkipCall(level, skipCall, format, args...); err != nil {
 			return err
