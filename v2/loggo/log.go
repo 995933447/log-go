@@ -6,15 +6,21 @@ import (
 	"github.com/995933447/log-go/v2/loggo/logger/writer"
 	"github.com/995933447/runtimeutil"
 	jsoniter "github.com/json-iterator/go"
+	"os"
 	"strconv"
 	"time"
 )
 
 var (
 	moduleName                     = "loggo"
+	nodeId                         = os.Getpid()
 	defaultCfgLoader               *logger.ConfLoader
 	defaultLogger, exceptionLogger *logger.Logger
 )
+
+func SetNodeId(n int) {
+	nodeId = n
+}
 
 func SetModuleName(m string) {
 	moduleName = m
@@ -120,7 +126,7 @@ func InitWithAlertFileLogger(baseDir, filePrefix string, skipCall int, cfgLoader
 }
 
 func OpenNewFileByByDateHour(writer *writer.FileWriter, _ *time.Time, _ bool) (string, bool) {
-	fileName := writer.GetFilePrefix() + time.Now().Format("2006010215") + ".txt"
+	fileName := writer.GetFilePrefix() + time.Now().Format("2006010215") + fmt.Sprintf("_%d", nodeId) + ".txt"
 
 	if writer.GetCurFileName() != fileName {
 		return fileName, true
@@ -307,4 +313,12 @@ func WriteBySkipCall(level logger.Level, skipCall int, format string, args ...in
 	if err := defaultLogger.WriteBySkipCall(level, skipCall, append([]interface{}{format}, args...)...); err != nil {
 		fmt.Println(err)
 	}
+}
+
+func EnableStdoutPrinter() {
+	defaultLogger.EnableStdoutPrinter()
+}
+
+func DisableStdoutPrinter() {
+	defaultLogger.DisableStdoutPrinter()
 }
