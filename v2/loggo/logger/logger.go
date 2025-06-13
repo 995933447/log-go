@@ -30,6 +30,8 @@ type Writer interface {
 	GetMsgBySkipCall(level Level, skipCall int, format string, args ...interface{}) (*Msg, error)
 	GetSkipCall() int
 	Flush() error
+	EnableStdoutPrinter()
+	DisableStdoutPrinter()
 }
 
 type Logger struct {
@@ -181,4 +183,12 @@ func (l *Logger) Write(level Level, args ...interface{}) error {
 
 func (l *Logger) Flush() error {
 	return l.writer.Flush()
+}
+
+func (l *Logger) EnableStdoutPrinter() {
+	l.writer.EnableStdoutPrinter()
+}
+
+func (l *Logger) DisableStdoutPrinter() {
+	l.writer.DisableStdoutPrinter()
 }
