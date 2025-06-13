@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/995933447/gofiler"
-	logger2 "github.com/995933447/log-go/v2/loggo/logger"
-	fmts2 "github.com/995933447/log-go/v2/loggo/logger/fmts"
+	"github.com/995933447/log-go/v2/loggo/logger"
+	"github.com/995933447/log-go/v2/loggo/logger/fmts"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,14 +18,14 @@ const (
 	CompressedFileSuffix = ".zip"
 )
 
-var levelToStdoutColorMap = map[logger2.Level]logger2.Color{
-	logger2.LevelDebug:     logger2.ColorLightGreen,
-	logger2.LevelInfo:      logger2.ColorLightGreen,
-	logger2.LevelImportant: logger2.ColorBlue,
-	logger2.LevelWarn:      logger2.ColorGreen,
-	logger2.LevelError:     logger2.ColorRed,
-	logger2.LevelPanic:     logger2.ColorRed,
-	logger2.LevelFatal:     logger2.ColorPurple,
+var levelToStdoutColorMap = map[logger.Level]logger.Color{
+	logger.LevelDebug:     logger.ColorLightGreen,
+	logger.LevelInfo:      logger.ColorLightGreen,
+	logger.LevelImportant: logger.ColorBlue,
+	logger.LevelWarn:      logger.ColorGreen,
+	logger.LevelError:     logger.ColorRed,
+	logger.LevelPanic:     logger.ColorRed,
+	logger.LevelFatal:     logger.ColorPurple,
 }
 
 type CheckTimeToOpenNewFileFunc func(writer *FileWriter, lastOpenFileTime *time.Time, isNeverOpenFile bool) (string, bool)
@@ -58,12 +58,12 @@ type FileLogConf struct {
 	MaxFileSize int64
 }
 
-var _ logger2.Writer = (*FileWriter)(nil)
+var _ logger.Writer = (*FileWriter)(nil)
 
 type FileWriterConf struct {
 	ModuleName, BaseDir, FilePrefix string
 	SkipCall                        int
-	LogCfgLoader                    *logger2.ConfLoader
+	LogCfgLoader                    *logger.ConfLoader
 	CheckFileFullIntervalSec        int64
 	CheckTimeToOpenNewFile          CheckTimeToOpenNewFileFunc
 	BufChanLen                      uint32
@@ -93,7 +93,7 @@ func NewFileWriter(cfg *FileWriterConf) (*FileWriter, error) {
 	}
 	return &FileWriter{
 		cfg:             cfg,
-		fmt:             fmts2.NewTraceFormatter(cfg.ModuleName, cfg.SkipCall, fmts2.FormatText, false, cfg.LogCfgLoader),
+		fmt:             fmts.NewTraceFormatter(cfg.ModuleName, cfg.SkipCall, fmts.FormatText, false, cfg.LogCfgLoader),
 		bufCh:           make(chan []byte, cfg.BufChanLen),
 		flushSignCh:     make(chan struct{}),
 		flushDoneSignCh: make(chan error),
@@ -110,7 +110,7 @@ type FileWriter struct {
 	isWrittenFullTip     bool
 	openCurFileTime      *time.Time
 	curFileName          string
-	fmt                  logger2.Formatter
+	fmt                  logger.Formatter
 	bufCh                chan []byte
 	isFlushing           atomic.Bool
 	flushSignCh          chan struct{}
@@ -150,7 +150,7 @@ func (w *FileWriter) DisableStdoutPrinter() {
 	w.enabledStdoutPrinter.Store(false)
 }
 
-func (w *FileWriter) SetFormatter(fmt logger2.Formatter) *FileWriter {
+func (w *FileWriter) SetFormatter(fmt logger.Formatter) *FileWriter {
 	w.fmt = fmt
 	return w
 }
@@ -230,16 +230,16 @@ func (w *FileWriter) tryOpenNewFile() error {
 	return nil
 }
 
-func (w *FileWriter) isLoggable(level logger2.Level) bool {
+func (w *FileWriter) isLoggable(level logger.Level) bool {
 	if level < w.cfg.LogCfgLoader.GetConf().File.GetLevel() {
 		return false
 	}
 
 	limitedBytes := int64(-1)
 	switch level {
-	case logger2.LevelDebug:
+	case logger.LevelDebug:
 		limitedBytes = w.cfg.LogCfgLoader.GetConf().File.LogDebugBeforeFileSizeBytes
-	case logger2.LevelInfo:
+	case logger.LevelInfo:
 		limitedBytes = w.cfg.LogCfgLoader.GetConf().File.LogInfoBeforeFileSizeBytes
 	}
 	if limitedBytes >= 0 && w.curSizeBytes >= limitedBytes {
@@ -260,14 +260,14 @@ func (w *FileWriter) asyncWrite(logContent string) {
 	}
 }
 
-func (w *FileWriter) WriteBySkipCall(level logger2.Level, skipCall int, format string, args ...interface{}) error {
+func (w *FileWriter) WriteBySkipCall(level logger.Level, skipCall int, format string, args ...interface{}) error {
 	if !w.isLoggable(level) {
 		return nil
 	}
 
 	stdoutColor, ok := levelToStdoutColorMap[level]
 	if !ok {
-		stdoutColor = logger2.ColorNil
+		stdoutColor = logger.ColorNil
 	}
 
 	fm := w.fmt
@@ -290,14 +290,14 @@ func (w *FileWriter) WriteBySkipCall(level logger2.Level, skipCall int, format s
 	return nil
 }
 
-func (w *FileWriter) Write(level logger2.Level, format string, args ...interface{}) error {
+func (w *FileWriter) Write(level logger.Level, format string, args ...interface{}) error {
 	if !w.isLoggable(level) {
 		return nil
 	}
 
 	stdoutColor, ok := levelToStdoutColorMap[level]
 	if !ok {
-		stdoutColor = logger2.ColorNil
+		stdoutColor = logger.ColorNil
 	}
 
 	logContent, err := w.fmt.Sprintf(level, stdoutColor, format, args...)
@@ -314,7 +314,7 @@ func (w *FileWriter) Write(level logger2.Level, format string, args ...interface
 	return nil
 }
 
-func (w *FileWriter) WriteMsg(msg *logger2.Msg) error {
+func (w *FileWriter) WriteMsg(msg *logger.Msg) error {
 	if !w.isLoggable(msg.Level) {
 		return nil
 	}
@@ -324,10 +324,10 @@ func (w *FileWriter) WriteMsg(msg *logger2.Msg) error {
 	return nil
 }
 
-func (w *FileWriter) GetMsg(level logger2.Level, format string, args ...interface{}) (*logger2.Msg, error) {
+func (w *FileWriter) GetMsg(level logger.Level, format string, args ...interface{}) (*logger.Msg, error) {
 	stdoutColor, ok := levelToStdoutColorMap[level]
 	if !ok {
-		stdoutColor = logger2.ColorNil
+		stdoutColor = logger.ColorNil
 	}
 
 	formatted, err := w.fmt.Sprintf(level, stdoutColor, format, args...)
@@ -335,7 +335,7 @@ func (w *FileWriter) GetMsg(level logger2.Level, format string, args ...interfac
 		return nil, err
 	}
 
-	return &logger2.Msg{
+	return &logger.Msg{
 		Level:     level,
 		Format:    format,
 		Args:      args,
@@ -344,10 +344,10 @@ func (w *FileWriter) GetMsg(level logger2.Level, format string, args ...interfac
 	}, nil
 }
 
-func (w *FileWriter) GetMsgBySkipCall(level logger2.Level, skipCall int, format string, args ...interface{}) (*logger2.Msg, error) {
+func (w *FileWriter) GetMsgBySkipCall(level logger.Level, skipCall int, format string, args ...interface{}) (*logger.Msg, error) {
 	stdoutColor, ok := levelToStdoutColorMap[level]
 	if !ok {
-		stdoutColor = logger2.ColorNil
+		stdoutColor = logger.ColorNil
 	}
 
 	fm := w.fmt
@@ -361,7 +361,7 @@ func (w *FileWriter) GetMsgBySkipCall(level logger2.Level, skipCall int, format 
 		return nil, err
 	}
 
-	return &logger2.Msg{
+	return &logger.Msg{
 		Level:     level,
 		Format:    format,
 		Args:      args,
@@ -483,7 +483,7 @@ func (w *FileWriter) Loop() {
 			if w.isWrittenFullTip {
 				return nil
 			}
-			buf = []byte(fmt.Sprintf("%s文件已超出当前小时允许最大尺寸:%d bytes!!!\u001B[0m\n", logger2.ColorToStdoutMap[logger2.ColorPurple], w.cfg.LogCfgLoader.GetConf().File.MaxFileSizeBytes))
+			buf = []byte(fmt.Sprintf("%s文件已超出当前小时允许最大尺寸:%d bytes!!!\u001B[0m\n", logger.ColorToStdoutMap[logger.ColorPurple], w.cfg.LogCfgLoader.GetConf().File.MaxFileSizeBytes))
 		}
 
 		w.isWrittenFullTip = isFull
