@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"sync"
 )
 
 type Formatter interface {
@@ -36,7 +35,6 @@ type Writer interface {
 
 type Logger struct {
 	writer Writer
-	mu     sync.RWMutex
 }
 
 func NewLogger(writer Writer) *Logger {
