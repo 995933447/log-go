@@ -125,10 +125,18 @@ func InitWithAlertFileLogger(baseDir, filePrefix string, skipCall int, cfgLoader
 	return withAlertLogger, nil
 }
 
-func OpenNewFileByByDateHour(writer *writer.FileWriter, _ *time.Time, _ bool) (string, bool) {
-	fileName := writer.GetFilePrefix() + time.Now().Format("2006010215") + fmt.Sprintf("_%d", nodeId) + ".txt"
+func OpenNewFileByByDateHour(writer *writer.FileWriter, lastOpenFileTime *time.Time, isNeverOpenFile bool) (string, bool) {
+	fileName := writer.GetFilePrefix() + time.Now().Format("200601021504") + fmt.Sprintf("_%d", nodeId) + ".txt"
+	
+	if isNeverOpenFile {
+		return fileName, true
+	}
 
-	if writer.GetCurFileName() != fileName {
+	if lastOpenFileTime.Hour() != time.Now().Hour() {
+		return fileName, true
+	}
+
+	if writer.GetFileSize() >= writer.GetFileConf().MaxFileSizeBytes {
 		return fileName, true
 	}
 

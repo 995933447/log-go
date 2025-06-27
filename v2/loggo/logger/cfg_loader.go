@@ -10,7 +10,9 @@ import (
 
 type LogConf struct {
 	File       FileLogConf
+	GameFrame  GameFrameLogConf //gameFrame专用
 	AlertLevel string
+	LogRpcx    bool
 }
 
 type GameFrameLogConf struct {
@@ -31,6 +33,7 @@ type FileLogConf struct {
 	LogDebugBeforeFileSizeBytes int64  // 文件允许写入debug日志的大小阀值,-1代表不限制
 	LogInfoBeforeFileSizeBytes  int64  // 文件允许写入info日志的大小阀值,-1代表不限制
 	FileMaxRemainDays           int    // 文件最大保留天数
+	MaxRemainFileNum            int    // 保留文件数量
 	CompressFrequentHours       int    // 压缩频率小时数
 	CompressAfterReachBytes     int64  // 压缩最小文件大小
 }

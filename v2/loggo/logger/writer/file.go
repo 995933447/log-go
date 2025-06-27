@@ -8,6 +8,7 @@ import (
 	"github.com/995933447/log-go/v2/loggo/logger/fmts"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -31,7 +32,7 @@ var levelToStdoutColorMap = map[logger.Level]logger.Color{
 type CheckTimeToOpenNewFileFunc func(writer *FileWriter, lastOpenFileTime *time.Time, isNeverOpenFile bool) (string, bool)
 
 var OpenNewFileByByDateHour CheckTimeToOpenNewFileFunc = func(writer *FileWriter, lastOpenFileTime *time.Time, isNeverOpenFile bool) (string, bool) {
-	fileName := writer.getFilePrefix() + time.Now().Format("2006010215") + "_" + FileSuffix
+	fileName := writer.getFilePrefix() + time.Now().Format("200601021504") + "_" + FileSuffix
 
 	if writer.fp == nil {
 		return fileName, true
@@ -48,6 +49,10 @@ var OpenNewFileByByDateHour CheckTimeToOpenNewFileFunc = func(writer *FileWriter
 	lastOpenYear, lastOpenMonth, lastOpenDay := lastOpenFileTime.Date()
 	nowYear, nowMonth, nowDay := time.Now().Date()
 	if lastOpenDay != nowDay || lastOpenMonth != nowMonth || lastOpenYear != nowYear {
+		return fileName, true
+	}
+
+	if writer.GetFileSize() >= writer.GetFileConf().MaxFileSizeBytes {
 		return fileName, true
 	}
 
@@ -144,6 +149,14 @@ func (w *FileWriter) GetSkipCall() int {
 
 func (w *FileWriter) EnableStdoutPrinter() {
 	w.enabledStdoutPrinter.Store(true)
+}
+
+func (w *FileWriter) GetFileSize() int64 {
+	return w.curSizeBytes
+}
+
+func (w *FileWriter) GetFileConf() logger.FileLogConf {
+	return w.cfg.LogCfgLoader.GetConf().File
 }
 
 func (w *FileWriter) DisableStdoutPrinter() {
@@ -394,6 +407,42 @@ func (w *FileWriter) hdlExpiredFiles() {
 
 	w.isHandlingExpiredLog.Store(true)
 	defer w.isHandlingExpiredLog.Store(false)
+
+	if logCfg.MaxRemainFileNum > 0 {
+		var (
+			files         []*os.FileInfo
+			mapFileToPath = make(map[*os.FileInfo]string)
+		)
+		_ = filepath.Walk(w.cfg.BaseDir, func(path string, info os.FileInfo, err error) error {
+			if info == nil {
+				return nil
+			}
+
+			if info.IsDir() {
+				return nil
+			}
+
+			if strings.HasPrefix(filepath.Base(path), w.getFilePrefix()) && (strings.HasSuffix(path, FileSuffix) || strings.HasSuffix(path, CompressedFileSuffix)) {
+				files = append(files, &info)
+				mapFileToPath[&info] = path
+			}
+
+			return nil
+		})
+		sort.Slice(files, func(i, j int) bool {
+			f1 := files[i]
+			f2 := files[j]
+			return (*f1).ModTime().Unix() > (*f2).ModTime().Unix()
+		})
+		fileNum := len(files)
+		if fileNum > logCfg.MaxRemainFileNum {
+			for i := logCfg.MaxRemainFileNum; i < fileNum; i++ {
+				if err := os.Remove(mapFileToPath[files[i]]); err != nil {
+					fmt.Println(err)
+				}
+			}
+		}
+	}
 
 	_ = filepath.Walk(w.cfg.BaseDir, func(path string, info os.FileInfo, err error) error {
 		//defer func() {
