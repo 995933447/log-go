@@ -2,13 +2,15 @@ package loggo
 
 import (
 	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/995933447/log-go/v2/loggo/logger"
 	"github.com/995933447/log-go/v2/loggo/logger/writer"
 	"github.com/995933447/runtimeutil"
 	jsoniter "github.com/json-iterator/go"
-	"os"
-	"strconv"
-	"time"
 )
 
 var (
@@ -127,7 +129,7 @@ func InitWithAlertFileLogger(baseDir, filePrefix string, skipCall int, cfgLoader
 
 func OpenNewFileByByDateHour(writer *writer.FileWriter, lastOpenFileTime *time.Time, isNeverOpenFile bool) (string, bool) {
 	fileName := writer.GetFilePrefix() + time.Now().Format("200601021504") + fmt.Sprintf("_%d", nodeId) + ".txt"
-	
+
 	if isNeverOpenFile {
 		return fileName, true
 	}
@@ -171,66 +173,80 @@ func GetLevel() logger.Level {
 	return logger.LevelDebug
 }
 
-func fmtMsgForPrint(v ...interface{}) string {
-	msg := "" // fmt.Sprintf("[%s.%d]|", serverName, serverID)
-	for _, a := range v {
-		msg = msg + " -- " + AutoToString(a)
-	}
-	return msg
+type MsgFormatForPrint struct {
+	args []interface{}
 }
 
-func AutoToString(a interface{}) string {
-	if a == nil {
-		return ""
-	}
-	switch s := a.(type) {
-	case error:
-		e, ok := a.(error)
-		if ok && e != nil {
-			return a.(error).Error()
-		} else {
-			return ""
+func (m *MsgFormatForPrint) String() string {
+	var b strings.Builder
+	b.Grow(15 * len(m.args))
+	for i, a := range m.args {
+		if i > 0 {
+			b.WriteString(" - ")
 		}
-	case string:
-		return s
-	case *string:
-		return *s
-	case bool:
-		return strconv.FormatBool(s) //fmt.Sprintf("%t", s)
-	case *bool:
-		return strconv.FormatBool(*s) //fmt.Sprintf("%t", *s)
-	case int:
-		return strconv.FormatInt(int64(s), 10)
-	case *int:
-		return strconv.FormatInt(int64(*s), 10)
-	case int32:
-		return strconv.FormatInt(int64(s), 10)
-	case *int32:
-		return strconv.FormatInt(int64(*s), 10) //fmt.Sprintf("%d", *s)
-	case int64:
-		return strconv.FormatInt(s, 10)
-	case *int64:
-		return strconv.FormatInt((*s), 10) //fmt.Sprintf("%d", *s)
-	case float64:
-		return fmt.Sprintf("%g", s)
-	case *float64:
-		return fmt.Sprintf("%g", *s)
-	case uint:
-		return strconv.FormatUint(uint64(s), 10)
-	case *uint:
-		return strconv.FormatUint(uint64(*s), 10)
-	case uint32:
-		return strconv.FormatUint(uint64(s), 10)
-	case *uint32:
-		return strconv.FormatUint(uint64(*s), 10)
-	case uint64:
-		return strconv.FormatUint(s, 10)
-	case *uint64:
-		return strconv.FormatUint((*s), 10)
-	default:
-		ss, _ := jsoniter.MarshalToString(s)
-		return ss
+		switch x := a.(type) {
+		case string:
+			b.WriteString(x)
+		case int8:
+			b.WriteString(strconv.FormatInt(int64(x), 10))
+		case int:
+			b.WriteString(strconv.FormatInt(int64(x), 10))
+		case int32:
+			b.WriteString(strconv.FormatInt(int64(x), 10))
+		case int64:
+			b.WriteString(strconv.FormatInt(x, 10))
+		case uint:
+			b.WriteString(strconv.FormatUint(uint64(x), 10))
+		case uint8:
+			b.WriteString(strconv.FormatUint(uint64(x), 10))
+		case uint32:
+			b.WriteString(strconv.FormatUint(uint64(x), 10))
+		case uint64:
+			b.WriteString(strconv.FormatUint(x, 10))
+		case float32:
+			b.WriteString(strconv.FormatFloat(float64(x), 'f', -1, 32))
+		case float64:
+			b.WriteString(strconv.FormatFloat(x, 'f', -1, 64))
+		case bool:
+			b.WriteString(strconv.FormatBool(x))
+		case *int8:
+			b.WriteString(strconv.FormatInt(int64(*x), 10))
+		case *int:
+			b.WriteString(strconv.FormatInt(int64(*x), 10))
+		case *int32:
+			b.WriteString(strconv.FormatInt(int64(*x), 10))
+		case *int64:
+			b.WriteString(strconv.FormatInt(*x, 10))
+		case *uint:
+			b.WriteString(strconv.FormatUint(uint64(*x), 10))
+		case *uint8:
+			b.WriteString(strconv.FormatUint(uint64(*x), 10))
+		case *uint32:
+			b.WriteString(strconv.FormatUint(uint64(*x), 10))
+		case *uint64:
+			b.WriteString(strconv.FormatUint(*x, 10))
+		case *float32:
+			b.WriteString(strconv.FormatFloat(float64(*x), 'f', -1, 32))
+		case *float64:
+			b.WriteString(strconv.FormatFloat(*x, 'f', -1, 64))
+		case *bool:
+			b.WriteString(strconv.FormatBool(*x))
+		case error:
+			b.WriteString(x.Error())
+		case fmt.Stringer:
+			b.WriteString(x.String())
+		default:
+			if j, _ := jsoniter.ConfigFastest.MarshalToString(x); j != "" {
+				b.WriteString(j)
+			}
+		}
 	}
+
+	return b.String()
+}
+
+func fmtMsgForPrint(v ...interface{}) *MsgFormatForPrint {
+	return &MsgFormatForPrint{args: v}
 }
 
 func Debug(content interface{}) {
@@ -302,7 +318,7 @@ func PrintImportant(args ...interface{}) {
 }
 
 func PrintWarn(args ...interface{}) {
-	defaultLogger.Warnf(fmtMsgForPrint(args...))
+	defaultLogger.Warn(fmtMsgForPrint(args...))
 }
 
 func PrintError(args ...interface{}) {
@@ -310,7 +326,7 @@ func PrintError(args ...interface{}) {
 }
 
 func PrintPanic(args ...interface{}) {
-	defaultLogger.Panicf(fmtMsgForPrint(args...))
+	defaultLogger.Panic(fmtMsgForPrint(args...))
 }
 
 func PrintFatal(args ...interface{}) {
