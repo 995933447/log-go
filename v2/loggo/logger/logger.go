@@ -1,46 +1,56 @@
 package logger
 
 import (
-	"errors"
 	"fmt"
 	"log"
+	"sync"
 )
 
 type Formatter interface {
+	DisableCacheCaller(disabled bool)
 	SetSkipCall(skipCall int)
 	Copy() Formatter
 	GetSkipCall() int
-	Sprintf(level Level, stdoutColor Color, format string, args ...interface{}) (string, error)
+	Sprintf(level Level, stdoutColor Color, args ...interface{}) ([]byte, error)
 }
 
 type Msg struct {
 	Level     Level
-	Format    string
-	Args      []interface{}
 	SkipCall  int
-	Formatted string
+	Formatted []byte
 }
 
 type Writer interface {
-	Write(level Level, format string, args ...interface{}) error
-	WriteBySkipCall(level Level, skipCall int, format string, args ...interface{}) error
-	WriteMsg(msg *Msg) error
-	GetMsg(level Level, format string, args ...interface{}) (*Msg, error)
-	GetMsgBySkipCall(level Level, skipCall int, format string, args ...interface{}) (*Msg, error)
-	GetSkipCall() int
-	Flush() error
+	IsLoggable(level Level) bool
+	DisableCacheCaller(disabled bool)
 	EnableStdoutPrinter()
 	DisableStdoutPrinter()
+	Write(level Level, args ...interface{}) error
+	WriteBySkipCall(level Level, skipCall int, args ...interface{}) error
+	WriteMsg(msg *Msg) error
+	GetMsg(level Level, args ...interface{}) (*Msg, error)
+	GetMsgBySkipCall(level Level, skipCall int, args ...interface{}) (*Msg, error)
+	GetSkipCall() int
+	Flush() error
 }
 
 type Logger struct {
 	writer Writer
+	mu     sync.RWMutex
 }
 
 func NewLogger(writer Writer) *Logger {
 	return &Logger{
 		writer: writer,
 	}
+}
+
+func (l *Logger) EnableStdoutPrinter() {
+	l.writer.EnableStdoutPrinter()
+}
+
+func (l *Logger) DisableStdoutPrinter() {
+	l.writer.DisableStdoutPrinter()
 }
 
 func (l *Logger) GetWriter() Writer {
@@ -140,19 +150,7 @@ func (l *Logger) Fatalf(format string, args ...interface{}) {
 }
 
 func (l *Logger) WriteBySkipCall(level Level, skipCall int, args ...interface{}) error {
-	argNum := len(args)
-	if argNum == 0 {
-		return errors.New("args num is 0")
-	}
-
-	var realArgs []interface{}
-	if argNum > 1 {
-		realArgs = args[1:]
-	}
-
-	format := fmt.Sprintf("%s", args[0])
-
-	if err := l.writer.WriteBySkipCall(level, skipCall, format, realArgs...); err != nil {
+	if err := l.writer.WriteBySkipCall(level, skipCall, args...); err != nil {
 		return err
 	}
 
@@ -160,19 +158,7 @@ func (l *Logger) WriteBySkipCall(level Level, skipCall int, args ...interface{})
 }
 
 func (l *Logger) Write(level Level, args ...interface{}) error {
-	argNum := len(args)
-	if argNum == 0 {
-		return errors.New("args num is 0")
-	}
-
-	var realArgs []interface{}
-	if argNum > 1 {
-		realArgs = args[1:]
-	}
-
-	format := fmt.Sprintf("%s", args[0])
-
-	if err := l.writer.Write(level, format, realArgs...); err != nil {
+	if err := l.writer.Write(level, args...); err != nil {
 		return err
 	}
 
@@ -181,12 +167,4 @@ func (l *Logger) Write(level Level, args ...interface{}) error {
 
 func (l *Logger) Flush() error {
 	return l.writer.Flush()
-}
-
-func (l *Logger) EnableStdoutPrinter() {
-	l.writer.EnableStdoutPrinter()
-}
-
-func (l *Logger) DisableStdoutPrinter() {
-	l.writer.DisableStdoutPrinter()
 }
