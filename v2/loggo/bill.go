@@ -2,8 +2,10 @@ package loggo
 
 import (
 	"fmt"
-	logger2 "github.com/995933447/log-go/v2/loggo/logger"
 	"sync"
+
+	logger2 "git.888.fun/backend/afun-golang-pkg/qgframe/logs/logger"
+	"github.com/995933447/log-go/v2/loggo/logger"
 )
 
 var onBillFunc func(billName string)
@@ -19,15 +21,15 @@ func emitOnBill(billName string) {
 }
 
 var billLoggerFactory = &BillLoggerFactory{
-	loggerMap: make(map[string]*logger2.Logger),
+	loggerMap: make(map[string]*logger.Logger),
 }
 
 type BillLoggerFactory struct {
-	loggerMap map[string]*logger2.Logger
+	loggerMap map[string]*logger.Logger
 	mu        sync.RWMutex
 }
 
-func (b *BillLoggerFactory) MustLogger(billName string) *logger2.Logger {
+func (b *BillLoggerFactory) MustLogger(billName string) *logger.Logger {
 	b.mu.RLock()
 	billLogger, ok := billLoggerFactory.loggerMap[billName]
 	if ok {
@@ -56,11 +58,7 @@ func Bill(billName string, format string, args ...interface{}) {
 }
 
 func PrintBill(billName string, args ...interface{}) {
-	var msg string
-	for _, arg := range args {
-		msg = msg + " -- " + AutoToString(arg)
-	}
-	billLoggerFactory.MustLogger(billName).Important(msg)
+	billLoggerFactory.MustLogger(billName).Important(fmtMsgForPrint(args...))
 	emitOnBill(billName)
 }
 
@@ -72,11 +70,7 @@ func BillBySkipCall(skipCall int, billName string, format string, args ...interf
 }
 
 func PrintBillBySkipCall(skipCall int, billName string, args ...interface{}) {
-	var msg string
-	for _, arg := range args {
-		msg = msg + " -- " + AutoToString(arg)
-	}
-	if err := billLoggerFactory.MustLogger(billName).WriteBySkipCall(logger2.LevelImportant, skipCall, msg); err != nil {
+	if err := billLoggerFactory.MustLogger(billName).WriteBySkipCall(logger.LevelImportant, skipCall, fmtMsgForPrint(args...)); err != nil {
 		fmt.Println(err)
 	}
 	emitOnBill(billName)
