@@ -26,6 +26,16 @@ var LevelToStrMap = map[Level]string{
 	LevelFatal:     "FATAL",
 }
 
+var StrToLevelMap = map[string]Level{
+	"DBG":   LevelDebug,
+	"INFO":  LevelInfo,
+	"IMP":   LevelImportant,
+	"WARN":  LevelWarn,
+	"ERR":   LevelError,
+	"PANIC": LevelPanic,
+	"FATAL": LevelFatal,
+}
+
 func TransferLevelToStr(level Level) (string, error) {
 	if str, ok := LevelToStrMap[level]; ok {
 		return str, nil
@@ -35,12 +45,6 @@ func TransferLevelToStr(level Level) (string, error) {
 }
 
 func TransStrToLevel(levelStr string) Level {
-	var level Level
-	for l, name := range LevelToStrMap {
-		if name == levelStr {
-			level = l
-			break
-		}
-	}
+	level := StrToLevelMap[levelStr]
 	return level
 }
