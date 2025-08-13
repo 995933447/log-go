@@ -2,22 +2,16 @@ package logger
 
 import (
 	"fmt"
-	"github.com/BurntSushi/toml"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/BurntSushi/toml"
 )
 
 type LogConf struct {
 	File       FileLogConf
-	GameFrame  GameFrameLogConf //gameFrame专用
 	AlertLevel string
-	LogRpcx    bool
-}
-
-type GameFrameLogConf struct {
-	TraceAllUid   bool
-	TraceAllTable bool
 }
 
 type FileLogConf struct {
