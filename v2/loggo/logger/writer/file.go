@@ -272,7 +272,7 @@ func (w *FileWriter) asyncWrite(logContent []byte) {
 	case w.bufCh <- logContent:
 	default:
 		if time.Now().Unix()-w.lastFullBufChTipAt.Load() > 5 {
-			fmt.Println("log chan is full, content:", logContent)
+			fmt.Println("log chan is full, content:", string(logContent))
 			w.lastFullBufChTipAt.Store(time.Now().Unix())
 		}
 	}
