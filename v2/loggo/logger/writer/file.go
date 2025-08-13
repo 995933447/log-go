@@ -3,15 +3,16 @@ package writer
 import (
 	"errors"
 	"fmt"
-	"github.com/995933447/gofiler"
-	"github.com/995933447/log-go/v2/loggo/logger"
-	"github.com/995933447/log-go/v2/loggo/logger/fmts"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/995933447/gofiler"
+	"github.com/995933447/log-go/v2/loggo/logger"
+	"github.com/995933447/log-go/v2/loggo/logger/fmts"
 )
 
 const (
@@ -98,7 +99,7 @@ func NewFileWriter(cfg *FileWriterConf) (*FileWriter, error) {
 	}
 	return &FileWriter{
 		cfg:             cfg,
-		fmt:             fmts.NewTraceFormatter(cfg.ModuleName, cfg.SkipCall, fmts.FormatText, false, cfg.LogCfgLoader),
+		fmt:             fmts.NewTraceFormatter(cfg.ModuleName, cfg.SkipCall, fmts.FormatText, false, false, cfg.LogCfgLoader),
 		bufCh:           make(chan []byte, cfg.BufChanLen),
 		flushSignCh:     make(chan struct{}),
 		flushDoneSignCh: make(chan error),
@@ -122,6 +123,10 @@ type FileWriter struct {
 	flushDoneSignCh      chan error
 	isHandlingExpiredLog atomic.Bool
 	lastFullBufChTipAt   atomic.Int64
+}
+
+func (w *FileWriter) DisableCacheCaller(disabled bool) {
+	w.fmt.DisableCacheCaller(disabled)
 }
 
 func (w *FileWriter) GetCurFileName() string {
@@ -151,16 +156,16 @@ func (w *FileWriter) EnableStdoutPrinter() {
 	w.enabledStdoutPrinter.Store(true)
 }
 
+func (w *FileWriter) DisableStdoutPrinter() {
+	w.enabledStdoutPrinter.Store(false)
+}
+
 func (w *FileWriter) GetFileSize() int64 {
 	return w.curSizeBytes
 }
 
 func (w *FileWriter) GetFileConf() logger.FileLogConf {
 	return w.cfg.LogCfgLoader.GetConf().File
-}
-
-func (w *FileWriter) DisableStdoutPrinter() {
-	w.enabledStdoutPrinter.Store(false)
 }
 
 func (w *FileWriter) SetFormatter(fmt logger.Formatter) *FileWriter {
@@ -243,7 +248,7 @@ func (w *FileWriter) tryOpenNewFile() error {
 	return nil
 }
 
-func (w *FileWriter) isLoggable(level logger.Level) bool {
+func (w *FileWriter) IsLoggable(level logger.Level) bool {
 	if level < w.cfg.LogCfgLoader.GetConf().File.GetLevel() {
 		return false
 	}
@@ -262,9 +267,9 @@ func (w *FileWriter) isLoggable(level logger.Level) bool {
 	return true
 }
 
-func (w *FileWriter) asyncWrite(logContent string) {
+func (w *FileWriter) asyncWrite(logContent []byte) {
 	select {
-	case w.bufCh <- []byte(logContent):
+	case w.bufCh <- logContent:
 	default:
 		if time.Now().Unix()-w.lastFullBufChTipAt.Load() > 5 {
 			fmt.Println("log chan is full, content:", logContent)
@@ -273,8 +278,8 @@ func (w *FileWriter) asyncWrite(logContent string) {
 	}
 }
 
-func (w *FileWriter) WriteBySkipCall(level logger.Level, skipCall int, format string, args ...interface{}) error {
-	if !w.isLoggable(level) {
+func (w *FileWriter) WriteBySkipCall(level logger.Level, skipCall int, args ...interface{}) error {
+	if !w.IsLoggable(level) {
 		return nil
 	}
 
@@ -289,7 +294,7 @@ func (w *FileWriter) WriteBySkipCall(level logger.Level, skipCall int, format st
 		fm.SetSkipCall(skipCall)
 	}
 
-	logContent, err := fm.Sprintf(level, stdoutColor, format, args...)
+	logContent, err := fm.Sprintf(level, stdoutColor, args...)
 	if err != nil {
 		return err
 	}
@@ -303,8 +308,8 @@ func (w *FileWriter) WriteBySkipCall(level logger.Level, skipCall int, format st
 	return nil
 }
 
-func (w *FileWriter) Write(level logger.Level, format string, args ...interface{}) error {
-	if !w.isLoggable(level) {
+func (w *FileWriter) Write(level logger.Level, args ...interface{}) error {
+	if !w.IsLoggable(level) {
 		return nil
 	}
 
@@ -313,7 +318,7 @@ func (w *FileWriter) Write(level logger.Level, format string, args ...interface{
 		stdoutColor = logger.ColorNil
 	}
 
-	logContent, err := w.fmt.Sprintf(level, stdoutColor, format, args...)
+	logContent, err := w.fmt.Sprintf(level, stdoutColor, args...)
 	if err != nil {
 		return err
 	}
@@ -328,7 +333,7 @@ func (w *FileWriter) Write(level logger.Level, format string, args ...interface{
 }
 
 func (w *FileWriter) WriteMsg(msg *logger.Msg) error {
-	if !w.isLoggable(msg.Level) {
+	if !w.IsLoggable(msg.Level) {
 		return nil
 	}
 
@@ -337,27 +342,25 @@ func (w *FileWriter) WriteMsg(msg *logger.Msg) error {
 	return nil
 }
 
-func (w *FileWriter) GetMsg(level logger.Level, format string, args ...interface{}) (*logger.Msg, error) {
+func (w *FileWriter) GetMsg(level logger.Level, args ...interface{}) (*logger.Msg, error) {
 	stdoutColor, ok := levelToStdoutColorMap[level]
 	if !ok {
 		stdoutColor = logger.ColorNil
 	}
 
-	formatted, err := w.fmt.Sprintf(level, stdoutColor, format, args...)
+	formatted, err := w.fmt.Sprintf(level, stdoutColor, args...)
 	if err != nil {
 		return nil, err
 	}
 
 	return &logger.Msg{
 		Level:     level,
-		Format:    format,
-		Args:      args,
 		SkipCall:  w.fmt.GetSkipCall(),
 		Formatted: formatted,
 	}, nil
 }
 
-func (w *FileWriter) GetMsgBySkipCall(level logger.Level, skipCall int, format string, args ...interface{}) (*logger.Msg, error) {
+func (w *FileWriter) GetMsgBySkipCall(level logger.Level, skipCall int, args ...interface{}) (*logger.Msg, error) {
 	stdoutColor, ok := levelToStdoutColorMap[level]
 	if !ok {
 		stdoutColor = logger.ColorNil
@@ -369,15 +372,13 @@ func (w *FileWriter) GetMsgBySkipCall(level logger.Level, skipCall int, format s
 		fm.SetSkipCall(skipCall)
 	}
 
-	formatted, err := fm.Sprintf(level, stdoutColor, format, args...)
+	formatted, err := fm.Sprintf(level, stdoutColor, args...)
 	if err != nil {
 		return nil, err
 	}
 
 	return &logger.Msg{
 		Level:     level,
-		Format:    format,
-		Args:      args,
 		SkipCall:  skipCall,
 		Formatted: formatted,
 	}, nil
