@@ -300,7 +300,7 @@ func (w *FileWriter) WriteBySkipCall(level logger.Level, skipCall int, args ...i
 	}
 
 	if w.enabledStdoutPrinter.Load() {
-		fmt.Print(logContent)
+		fmt.Print(string(logContent))
 	}
 
 	w.asyncWrite(logContent)
