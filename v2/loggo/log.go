@@ -138,7 +138,7 @@ func OpenNewFileByByDateHour(writer *writer.FileWriter, lastOpenFileTime *time.T
 		return fileName, true
 	}
 
-	if writer.GetFileSize() >= writer.GetFileConf().MaxFileSizeBytes {
+	if writer.GetFileConf().MaxFileSizeBytes > 0 && writer.GetFileSize() >= writer.GetFileConf().MaxFileSizeBytes {
 		return fileName, true
 	}
 
